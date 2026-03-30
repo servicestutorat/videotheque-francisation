@@ -457,7 +457,7 @@ button{font-family:'Outfit',sans-serif}
 /* ═══════ CONFIG ═══════ */
 const CFG={
   SHEET_CSV_URL:'https://docs.google.com/spreadsheets/d/e/2PACX-1vSn-N0H4FeidFXTwCyKluhu7aca11us51wP0UC2dsiovebjzsJtrTe0MWclWDe9hOIIpTgj0rboT6o0/pub?gid=0&single=true&output=csv',
-  SCRIPT_URL:'https://script.google.com/macros/s/AKfycbxq9P8gcs233ECe_85PmndsxYhyQ46kmZPDzktVuG_kOkHt-d9qxM2vUpXcCE4EDjEXFA/exec'
+  SCRIPT_URL:'https://script.google.com/macros/s/AKfycbxkzXOIeVblIBmSwcssF6CQUyUCNFEdqOCpisJXnVe4z1pw64NVM1dXbfXy5WwvXHwB7g/exec'
 };
 
 /* ═══════ ACCESS CODES ═══════ */
@@ -942,10 +942,12 @@ async function handleImport(file){
 }
 
 /* ═══════ VIDEO ACTIONS ═══════ */
-function toggleHide(idx){
+async function toggleHide(idx){
   if(idx<0||idx>=videos.length)return;
   videos[idx].visible=videos[idx].visible==='non'?'oui':'non';
+  const v=videos[idx];
   render();
+  if(CFG.SCRIPT_URL){try{await fetch(CFG.SCRIPT_URL,{method:'POST',mode:'no-cors',body:JSON.stringify({action:'update',lien_video:v.lien_video,titre:v.titre,data:v}),headers:{'Content-Type':'application/json'}});}catch{}}
 }
 function askDelete(idx){
   pendingDeleteIdx=idx;
@@ -957,10 +959,12 @@ function askDelete(idx){
     if(dc&&dm){dm.textContent=`${t('delConfirm')} "${v.titre}"`;dc.style.display='block';}
   },50);
 }
-function confirmDelete(){
+async function confirmDelete(){
   if(pendingDeleteIdx>=0&&pendingDeleteIdx<videos.length){
+    const v=videos[pendingDeleteIdx];
     videos.splice(pendingDeleteIdx,1);pendingDeleteIdx=-1;
     closeModal();render();
+    if(CFG.SCRIPT_URL){try{await fetch(CFG.SCRIPT_URL,{method:'POST',mode:'no-cors',body:JSON.stringify({action:'delete',lien_video:v.lien_video,titre:v.titre}),headers:{'Content-Type':'application/json'}});}catch{}}
   }
 }
 
@@ -1026,7 +1030,7 @@ async function submitVideo(){
   } else {
     videos.unshift(item);
   }
-  if(CFG.SCRIPT_URL){try{await fetch(CFG.SCRIPT_URL,{method:'POST',mode:'no-cors',body:JSON.stringify(item),headers:{'Content-Type':'application/json'}});}catch{}}
+  if(CFG.SCRIPT_URL){try{await fetch(CFG.SCRIPT_URL,{method:'POST',mode:'no-cors',body:JSON.stringify({action:editIdx>=0?'update':'add',lien_video:editIdx>=0?videos[editIdx]&&videos[editIdx].lien_video||item.lien_video:item.lien_video,titre:editIdx>=0?videos[editIdx]&&videos[editIdx].titre||item.titre:item.titre,data:item}),headers:{'Content-Type':'application/json'}});}catch{}}
   btn.disabled=false;btn.textContent=t('publish');
   const toast=document.getElementById('toast');toast.textContent=editIdx>=0?'✓ Vidéo modifiée!':'✓ Ressource ajoutée!';toast.style.display='block';
   setTimeout(()=>{closeModal();render();},1000);
