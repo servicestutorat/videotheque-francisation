@@ -615,17 +615,36 @@ async function loadVideos(){
   render();
 }
 function parseCSV(csv){
-  const lines=csv.split('\n').filter(l=>l.trim());if(lines.length<2)return[];
-  const hdrs=lines[0].split(',').map(h=>h.replace(/"/g,'').trim().toLowerCase());
+  // Retirer le BOM UTF-8 si présent
+  csv=csv.replace(/^\uFEFF/,'');
+  // Parseur CSV robuste — gère les champs entre guillemets avec virgules et sauts de ligne
+  const rows=[];let row=[],field='',inQ=false;
+  for(let i=0;i<csv.length;i++){
+    const ch=csv[i],nx=csv[i+1];
+    if(inQ){
+      if(ch==='"'&&nx==='"'){field+='"';i++;}
+      else if(ch==='"'){inQ=false;}
+      else{field+=ch;}
+    } else {
+      if(ch==='"'){inQ=true;}
+      else if(ch===','){row.push(field.trim());field='';}
+      else if(ch==='\r'&&nx==='\n'){row.push(field.trim());rows.push(row);row=[];field='';i++;}
+      else if(ch==='\n'||ch==='\r'){row.push(field.trim());rows.push(row);row=[];field='';}
+      else{field+=ch;}
+    }
+  }
+  if(field!==''||row.length>0){row.push(field.trim());rows.push(row);}
+  const nonEmpty=rows.filter(r=>r.some(f=>f!==''));
+  if(nonEmpty.length<2)return[];
+  const hdrs=nonEmpty[0].map(h=>h.replace(/"/g,'').trim().toLowerCase());
   const out=[];
-  for(let i=1;i<lines.length;i++){
-    const vals=splitRow(lines[i]);const obj={};
-    hdrs.forEach((h,idx)=>{obj[h]=(vals[idx]||'').replace(/^"|"$/g,'').trim();});
+  for(let i=1;i<nonEmpty.length;i++){
+    const vals=nonEmpty[i];const obj={};
+    hdrs.forEach((h,idx)=>{obj[h]=(vals[idx]||'').replace(/\r/g,'').trim();});
     if(obj.niveau&&obj.titre&&obj.lien_video){if(!obj.visible)obj.visible='oui';out.push(obj);}
   }
   return out;
 }
-function splitRow(r){const res=[];let c='',q=false;for(const ch of r){if(ch==='"'){q=!q}else if(ch===','&&!q){res.push(c);c=''}else c+=ch;}res.push(c);return res;}
 
 /* ═══════ FILTER ═══════ */
 const uniq=a=>[...new Set(a.filter(Boolean))];
@@ -988,7 +1007,7 @@ async function submitVideo(){
   if(!titre||!lien){alert('Le titre et le lien vidéo sont obligatoires.');return;}
   const item={
     niveau:document.getElementById('f-niv').value,categorie:document.getElementById('f-cat').value,
-    titre,description:document.getElementById('f-desc').value.trim(),
+    titre,description:document.getElementById('f-desc').value.trim().replace(/[\r\n]+/g,' '),
     lien_video:lien,lien_h5p:document.getElementById('f-h5p').value.trim(),
     tags:document.getElementById('f-tags').value.trim(),
     prof:document.getElementById('f-prof').value.trim(),duree:document.getElementById('f-dur').value.trim(),
