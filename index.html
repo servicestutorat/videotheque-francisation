@@ -125,10 +125,17 @@ button{font-family:'Outfit',sans-serif}
 .fav-filt.on{background:#fef9c3;border-color:var(--amb);color:#92400e}
 
 /* ── FILTER PANEL ── */
-.fpanel{background:var(--w);border:1px solid var(--g200);border-radius:var(--r);padding:1rem 1.25rem;margin-bottom:1.25rem;box-shadow:var(--sh)}
-.frow{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:7px}
-.frow:last-child{margin-bottom:0}
-.flbl-r{font-size:11px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:.4px;min-width:86px;flex-shrink:0}
+.fpanel{background:var(--w);border:1px solid var(--g200);border-radius:var(--r);margin-bottom:1.25rem;box-shadow:var(--sh);overflow:hidden}
+.fpanel-hdr{display:flex;align-items:center;justify-content:space-between;padding:.75rem 1.25rem;cursor:pointer;user-select:none;border-bottom:1px solid var(--g100)}
+.fpanel-hdr:hover{background:var(--g100)}
+.fpanel-hdr-lbl{font-size:13px;font-weight:700;color:var(--navy);display:flex;align-items:center;gap:6px}
+.fpanel-hdr-arrow{font-size:11px;color:var(--tx3);transition:transform .2s}
+.fpanel-hdr-arrow.open{transform:rotate(180deg)}
+.fpanel-body{padding:.75rem 1.25rem 1rem}
+.frow{display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;border-bottom:1px solid var(--g100);padding-bottom:8px}
+.frow:last-child{margin-bottom:0;border-bottom:none;padding-bottom:0}
+.flbl-r{font-size:11px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:.4px;min-width:90px;flex-shrink:0;padding-top:6px}
+.frow-pills{display:flex;flex-wrap:wrap;gap:5px;flex:1}
 .pill{padding:5px 13px;border-radius:20px;font-size:12px;font-weight:500;cursor:pointer;transition:var(--tr);border:1.5px solid var(--g200);background:var(--w);color:var(--tx2);display:inline-flex;align-items:center;gap:4px}
 .pill:hover{border-color:var(--bdk);color:var(--navy)}
 .pill.on{background:var(--navy);color:var(--w);border-color:var(--navy);font-weight:700}
@@ -563,12 +570,15 @@ function tryCode(){
   if(!acc){err.textContent='✗ Code incorrect. Demandez à votre professeur. / Incorrect code.';document.getElementById('code-inp').value='';document.getElementById('code-inp').focus();return;}
   role=acc.role;niveau=acc.niveau;
   lvlF=niveau==='ALL'?'ALL':niveau;
+  // Sauvegarder la session (7 jours)
+  localStorage.setItem('vf_session',JSON.stringify({role,niveau,ts:Date.now()}));
   const ov=document.getElementById('auth');
   ov.classList.add('hiding');
   setTimeout(()=>{ov.classList.add('gone');window.scrollTo(0,0);},360);
   setupUI();loadVideos();
 }
 function doLogout(){
+  localStorage.removeItem('vf_session');
   role=niveau=null;videos=[];previewMode=false;appView='dashboard';
   document.getElementById('code-inp').value='';document.getElementById('auth-err').textContent='';
   document.getElementById('fab').style.display='none';
@@ -715,7 +725,7 @@ function renderDashboard(main){
       <button class="sw-x" id="srch-x" style="display:${srchQ?'flex':'none'}" onclick="clrSrch()">✕</button>
     </div>
     <select class="sort-s" onchange="setSort(this.value)">
-      <option value="date"${sortM==='date'?' selected':''}>📅 ${t('recent')}</option>
+      <option value="date"${sortM==='date'?' selected':''}>${t('recent')}</option>
       <option value="az"${sortM==='az'?' selected':''}>A → Z</option>
       <option value="za"${sortM==='za'?' selected':''}>Z → A</option>
       <option value="level"${sortM==='level'?' selected':''}>Niveau A→B</option>
@@ -724,7 +734,7 @@ function renderDashboard(main){
       <button class="vb${viewM==='grid'?' on':''}" onclick="setVM('grid')" title="Grille">⊞</button>
       <button class="vb${viewM==='list'?' on':''}" onclick="setVM('list')" title="Liste">☰</button>
     </div>
-    <button class="fav-filt${favsOnly?' on':''}" onclick="togFavF()">★ ${t('favs')}${fc>0?` (${fc})`:''}</button>
+    <button class="fav-filt${favsOnly?' on':''}" onclick="togFavF()">${t('favs')}${fc>0?` (${fc})`:''}</button>
   </div>`;
 
   // filter panel
@@ -736,17 +746,27 @@ function renderDashboard(main){
   const cats=CATS.map(c=>c.id).filter(id=>lvlSet.some(v=>v.categorie===id));
   const hasRec=lvlSet.some(v=>v.recommandee==='oui');
 
-  html+=`<div class="fpanel">`;
-  if(cats.length>1){
-    html+=`<div class="frow"><span class="flbl-r">📂 Catégorie</span><button class="pill${catF==='ALL'?' on':''}" onclick="setCat('ALL')">${t('all')} <span class="pc">${lvlSet.length}</span></button>
-    ${cats.map(id=>{const c=CATS.find(x=>x.id===id)||{icon:'📎'};const n=lvlSet.filter(v=>v.categorie===id).length;return`<button class="pill${catF===id?' on':''}" onclick="setCat('${id.replace(/'/g,"\\'")}')"><span>${c.icon}</span>${id}<span class="pc">${n}</span></button>`;}).join('')}</div>`;
+  const activeFiltersCount=[catF,profF,accF,langF,compF,diffF].filter(f=>f!=='ALL').length+(recF?1:0)+(srchQ?1:0);
+  if(window._fpOpen===undefined)window._fpOpen=true;
+  const fpOpen=window._fpOpen;
+  html+=`<div class="fpanel">
+    <div class="fpanel-hdr" onclick="window._fpOpen=!window._fpOpen;render()">
+      <span class="fpanel-hdr-lbl">🎚 Filtres${activeFiltersCount>0?` <span style="background:var(--navy);color:#fff;border-radius:10px;padding:1px 7px;font-size:11px">${activeFiltersCount}</span>`:''}</span>
+      <span class="fpanel-hdr-arrow${fpOpen?' open':''}">▼</span>
+    </div>`;
+  if(fpOpen){
+    html+=`<div class="fpanel-body">`;
+    if(cats.length>1){
+      html+=`<div class="frow"><span class="flbl-r">📂 Catégorie</span><div class="frow-pills"><button class="pill${catF==='ALL'?' on':''}" onclick="setCat('ALL')">${t('all')} <span class="pc">${lvlSet.length}</span></button>${cats.map(id=>{const c=CATS.find(x=>x.id===id)||{icon:'📎'};const n=lvlSet.filter(v=>v.categorie===id).length;return`<button class="pill${catF===id?' on':''}" onclick="setCat('${id.replace(/'/g,"\\'")}')"><span>${c.icon}</span>${id}<span class="pc">${n}</span></button>`;}).join('')}</div></div>`;
+    }
+    if(profs.length){html+=`<div class="frow"><span class="flbl-r">👤 Professeur</span><div class="frow-pills"><button class="pill${profF==='ALL'?' on':''}" onclick="setF('prof','ALL')">Tous</button>${profs.map(p=>`<button class="pill${profF===p?' on':''}" onclick="setF('prof','${p.replace(/'/g,"\\'")}')}">${p}</button>`).join('')}</div></div>`;}
+    [{lbl:'🍁 Accent',i:accs,c:accF,k:'acc'},{lbl:'🌐 Langue',i:langs,c:langF,k:'lang'},{lbl:'📝 Compétence',i:comps,c:compF,k:'comp'},{lbl:'🎯 Difficulté',i:diffs,c:diffF,k:'diff'}].forEach(r=>{
+      if(!r.i.length)return;
+      html+=`<div class="frow"><span class="flbl-r">${r.lbl}</span><div class="frow-pills"><button class="pill${r.c==='ALL'?' on':''}" onclick="setF('${r.k}','ALL')">${t('all')}</button>${r.i.map(it=>`<button class="pill${r.c===it?' on':''}" onclick="setF('${r.k}','${it.replace(/'/g,"\\'")}')}">${it}</button>`).join('')}</div></div>`;
+    });
+    if(hasRec)html+=`<div class="frow"><span class="flbl-r">⭐ Sélection</span><div class="frow-pills"><button class="pill pill-star${recF?' on':''}" onclick="togRec()">⭐ Recommandées seulement</button></div></div>`;
+    html+=`</div>`;
   }
-  if(profs.length){html+=`<div class="frow"><span class="flbl-r">👤 Professeur</span><button class="pill${profF==='ALL'?' on':''}" onclick="setF('prof','ALL')">Tous</button>${profs.map(p=>`<button class="pill${profF===p?' on':''}" onclick="setF('prof','${p.replace(/'/g,"\\'")}')">${p}</button>`).join('')}</div>`;}
-  [{lbl:'🍁 Accent',i:accs,c:accF,k:'acc'},{lbl:'🌐 Langue',i:langs,c:langF,k:'lang'},{lbl:'📝 Compétence',i:comps,c:compF,k:'comp'},{lbl:'🎯 Difficulté',i:diffs,c:diffF,k:'diff'}].forEach(r=>{
-    if(!r.i.length)return;
-    html+=`<div class="frow"><span class="flbl-r">${r.lbl}</span><button class="pill${r.c==='ALL'?' on':''}" onclick="setF('${r.k}','ALL')">${t('all')}</button>${r.i.map(it=>`<button class="pill${r.c===it?' on':''}" onclick="setF('${r.k}','${it.replace(/'/g,"\\'")}')">${it}</button>`).join('')}</div>`;
-  });
-  if(hasRec)html+=`<div class="frow"><span class="flbl-r">⭐ Sélection</span><button class="pill pill-star${recF?' on':''}" onclick="togRec()">⭐ Recommandées seulement</button></div>`;
   html+=`</div>`;
 
   // active chips
@@ -1043,7 +1063,7 @@ function setF(k,v){if(k==='prof')profF=v;else if(k==='acc')accF=v;else if(k==='l
 function togRec(){recF=!recF;render();}
 function setSort(v){sortM=v;render();}
 function setVM(v){viewM=v;render();}
-function onSrch(v){srchQ=v;document.getElementById('srch-x').style.display=v?'flex':'none';render();}
+function onSrch(v){srchQ=v;const inp=document.getElementById('srch-inp');const pos=inp?inp.selectionStart:v.length;document.getElementById('srch-x').style.display=v?'flex':'none';render();const ni=document.getElementById('srch-inp');if(ni){ni.focus();try{ni.setSelectionRange(pos,pos);}catch{}}}
 function clrSrch(){srchQ='';const i=document.getElementById('srch-inp');if(i)i.value='';document.getElementById('srch-x').style.display='none';render();}
 function togFavF(){favsOnly=!favsOnly;render();}
 function clrAll(){catF='ALL';profF='ALL';accF='ALL';langF='ALL';compF='ALL';diffF='ALL';recF=false;srchQ='';favsOnly=false;render();}
@@ -1054,6 +1074,21 @@ function togFavCard(b){try{const id=decodeURIComponent(escape(atob(b.replace(/P/
 function getYtId(url){if(!url)return null;const ps=[/[?&]v=([^&#]+)/,/youtu\.be\/([^?#]+)/,/youtube\.com\/embed\/([^?#]+)/,/youtube\.com\/shorts\/([^?#]+)/];for(const p of ps){const m=url.match(p);if(m)return m[1];}return null;}
 function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
+
+/* ═══════ SESSION RESTORE ═══════ */
+(function(){
+  try{
+    const s=JSON.parse(localStorage.getItem('vf_session'));
+    const SEVEN_DAYS=7*24*60*60*1000;
+    if(s&&s.role&&s.niveau&&(Date.now()-s.ts)<SEVEN_DAYS){
+      role=s.role;niveau=s.niveau;
+      lvlF=niveau==='ALL'?'ALL':niveau;
+      const ov=document.getElementById('auth');
+      ov.classList.add('gone');
+      setupUI();loadVideos();
+    }
+  }catch{}
+})();
 </script>
 </body>
 </html>
