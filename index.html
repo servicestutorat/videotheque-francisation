@@ -123,6 +123,8 @@ button{font-family:'Outfit',sans-serif}
 .vb.on{background:var(--w);color:var(--navy);box-shadow:0 1px 4px rgba(0,0,0,.1)}
 .fav-filt{padding:8px 14px;border:1.5px solid var(--g200);border-radius:var(--rs);font-size:13px;font-weight:500;background:var(--w);color:var(--tx2);cursor:pointer;transition:var(--tr);display:flex;align-items:center;gap:5px;white-space:nowrap}
 .fav-filt.on{background:#fef9c3;border-color:var(--amb);color:#92400e}
+.btn-res{background:linear-gradient(135deg,#f0fdf4,#dcfce7);border:1.5px solid #86efac;color:#15803d;font-weight:600}
+.btn-res:hover{background:linear-gradient(135deg,#dcfce7,#bbf7d0);border-color:#4ade80}
 
 /* ── FILTER PANEL ── */
 .fpanel{background:var(--w);border:1px solid var(--g200);border-radius:var(--r);margin-bottom:1.25rem;box-shadow:var(--sh);overflow:hidden}
@@ -437,6 +439,7 @@ button{font-family:'Outfit',sans-serif}
     <div class="fg"><label class="fl" id="l-desc">Description <span class="op">(optionnel)</span></label><textarea class="ft" id="f-desc" placeholder="Décrivez brièvement le contenu..."></textarea></div>
     <div class="fg"><label class="fl" id="l-lien">Lien vidéo *</label><input type="url" class="fi" id="f-lien" placeholder="https://www.youtube.com/watch?v=..."></div>
     <div class="fg"><label class="fl" id="l-h5p">Lien exercice H5P <span class="op">(optionnel)</span></label><input type="url" class="fi" id="f-h5p" placeholder="https://app.lumi.education/run/..."></div>
+    <div class="fg"><label class="fl" id="l-res">📄 Fichier ressource <span class="op">(PDF, Word, PPT — lien Google Drive public, optionnel)</span></label><input type="url" class="fi" id="f-res" placeholder="https://drive.google.com/file/d/..."></div>
     <div class="fg"><label class="fl" id="l-tags">Mots-clés / Tags <span class="op">(séparés par virgule)</span></label><input type="text" class="fi" id="f-tags" placeholder="Ex: dialogue, formel, bureau, famille"></div>
     <div class="fr3">
       <div class="fg"><label class="fl" id="l-prof">Ajouté par <span class="op">(nom)</span></label><input type="text" class="fi" id="f-prof" placeholder="Ex: Marie T."></div>
@@ -464,7 +467,7 @@ button{font-family:'Outfit',sans-serif}
 /* ═══════ CONFIG ═══════ */
 const CFG={
   SHEET_CSV_URL:'https://docs.google.com/spreadsheets/d/e/2PACX-1vSn-N0H4FeidFXTwCyKluhu7aca11us51wP0UC2dsiovebjzsJtrTe0MWclWDe9hOIIpTgj0rboT6o0/pub?gid=0&single=true&output=csv',
-  SCRIPT_URL:'https://script.google.com/macros/s/AKfycbxkzXOIeVblIBmSwcssF6CQUyUCNFEdqOCpisJXnVe4z1pw64NVM1dXbfXy5WwvXHwB7g/exec'
+  SCRIPT_URL:'https://script.google.com/macros/s/AKfycbypFZrovGCvjMC2Zx4YdCA0cSVvfFCuokV6IMYVARCQxoXvo-udsKmkLTGhnbGVSyS0PA/exec'
 };
 
 /* ═══════ ACCESS CODES ═══════ */
@@ -828,6 +831,8 @@ function cardHtml(v,idx){
   if(v.competence)tags+=`<span class="vt vt-gen">${esc(v.competence)}</span>`;
   const vtags=(v.tags||'').split(',').map(tg=>tg.trim()).filter(Boolean).map(tg=>`<span class="vt vt-tag">${esc(tg)}</span>`).join('');
   const h5p=v.lien_h5p?`<a href="${v.lien_h5p}" target="_blank" rel="noopener" class="btn-e">${t('exo')}</a>`:'';
+  const resIcon=v.lien_ressource?((v.lien_ressource.toLowerCase().includes('.pdf')||v.lien_ressource.toLowerCase().includes('pdf'))?'📄':(v.lien_ressource.toLowerCase().includes('.ppt')||v.lien_ressource.toLowerCase().includes('ppt')||v.lien_ressource.toLowerCase().includes('presentation'))?'📊':(v.lien_ressource.toLowerCase().includes('.doc')||v.lien_ressource.toLowerCase().includes('doc')||v.lien_ressource.toLowerCase().includes('word'))?'📝':'📎'):'';
+  const resBtn=v.lien_ressource?`<a href="${v.lien_ressource}" target="_blank" rel="noopener" class="btn-e btn-res">${resIcon} ${lang==='fr'?'Télécharger':'Download'}</a>`:'';
   const idB=btoa(unescape(encodeURIComponent(id))).replace(/\+/g,'P').replace(/\//g,'S').replace(/=/g,'E');
   const showAdmin=(role==='admin'||role==='prof')&&!previewMode;
   return `<div class="vcard${isHidden?' hidden-card':''}${seen?' seen-c':''}">
@@ -850,6 +855,7 @@ function cardHtml(v,idx){
       <div class="vbtns">
         <a href="${v.lien_video}" target="_blank" rel="noopener" class="btn-w" onclick="mSeen('${idB}')">${t('watch')}</a>
         ${h5p}
+        ${resBtn}
       </div>
     </div>
   </div>`;
@@ -1006,6 +1012,7 @@ function openModal(idx){
     document.getElementById('f-desc').value=v.description||'';
     document.getElementById('f-lien').value=v.lien_video||'';
     document.getElementById('f-h5p').value=v.lien_h5p||'';
+    document.getElementById('f-res').value=v.lien_ressource||'';
     document.getElementById('f-tags').value=v.tags||'';
     document.getElementById('f-prof').value=v.prof||v.ajout_par||'';
     document.getElementById('f-dur').value=v.duree||'';
@@ -1015,7 +1022,7 @@ function openModal(idx){
     document.getElementById('f-lang').value=v.langue||v.langue_ciblee||'';
     document.getElementById('f-rec').checked=v.recommandee==='oui'||v.recommandee===true;
   } else {
-    ['f-titre','f-desc','f-lien','f-h5p','f-tags','f-prof','f-dur'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+    ['f-titre','f-desc','f-lien','f-h5p','f-res','f-tags','f-prof','f-dur'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
     ['f-diff','f-acc','f-comp','f-lang'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
     document.getElementById('f-rec').checked=false;
   }
@@ -1032,7 +1039,7 @@ async function submitVideo(){
   const item={
     niveau:document.getElementById('f-niv').value,categorie:document.getElementById('f-cat').value,
     titre,description:document.getElementById('f-desc').value.trim().replace(/[\r\n]+/g,' '),
-    lien_video:lien,lien_h5p:document.getElementById('f-h5p').value.trim(),
+    lien_video:lien,lien_h5p:document.getElementById('f-h5p').value.trim(),lien_ressource:document.getElementById('f-res').value.trim(),
     tags:document.getElementById('f-tags').value.trim(),
     prof:document.getElementById('f-prof').value.trim(),duree:document.getElementById('f-dur').value.trim(),
     difficulte:document.getElementById('f-diff').value,accent:document.getElementById('f-acc').value,
